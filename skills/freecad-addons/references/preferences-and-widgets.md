@@ -346,16 +346,30 @@ Rules:
 - Re-check that the panel is still open after each recompute before touching
   its widgets.
 
+The gate below is the code MaxProFrame runs in three task panels, with its
+long docstrings shortened: [`recompute_gate.py`](https://github.com/sclMAX/MaxProFrame/blob/main/freecad/maxproframe/recompute_gate.py),
+tested by `tests/test_recompute_gate*.py` and `tests/test_*_recompute_gate.py`
+in the same repository on FreeCAD 1.1 and a 27.1 development build.
+
 ```python
 import contextlib
+from functools import partial
+
+import FreeCADGui as Gui
 
 
 class RecomputeGate:
+    """Held while a panel recomputes; what the panel is asked to do meanwhile
+    waits for the hold to end. ``active`` tells whether the panel still runs:
+    queued work is dropped once it closed."""
+
     def __init__(self, active):
-        self._active = active  # callable: is the panel still open?
+        self._active = active
         self._depth = 0
         self._waiting = []
         self._button = None
+        # Whether the queue is being run: a hold ending meanwhile leaves what
+        # it queued to that run.
         self._releasing = False
 
     @property
@@ -364,6 +378,8 @@ class RecomputeGate:
 
     @contextlib.contextmanager
     def hold(self):
+        """Hold the gate for the block (a recompute of the panel and its
+        follow-up); then run what waited."""
         self._depth += 1
         try:
             yield
@@ -373,7 +389,8 @@ class RecomputeGate:
             self._release()
 
     def wait(self, work):
-        """Queue work while held; return whether it was queued."""
+        """Whether ``work`` waits for the recompute to end; an equal work
+        queued already runs once."""
         if not self.held:
             return False
         if work not in self._waiting:
@@ -381,52 +398,74 @@ class RecomputeGate:
         return True
 
     def defer(self, button):
-        """Keep the last dialog button pressed while held."""
+        """Whether a dialog button waits; the last one pressed runs after the
+        queued work and closes the dialog when it returns True."""
         if not self.held:
             return False
         self._button = button
         return True
 
+    def clear(self):
+        """Drop what waits: the panel closed."""
+        self._waiting = []
+        self._button = None
+
     def _release(self):
-        if self._releasing:  # a nested hold ended: the outer run drains it
+        """Run what waited, in order, then the button, only from the outermost
+        release. A work that raises does not stop the others nor the button:
+        the first error is raised once they ran."""
+        if self._releasing:
             return
         self._releasing = True
+        error = None
         try:
             while self._waiting or self._button is not None:
                 if self._waiting:
                     work = self._waiting.pop(0)
                 else:
-                    button, self._button = self._button, None
-                    work = lambda: self._press(button)  # noqa: E731
-                if self._active():
+                    work, self._button = partial(self._press, self._button), None
+                if not self._active():
+                    continue
+                try:
                     work()
+                except Exception as exception:
+                    error = error or exception
         finally:
             self._releasing = False
+        if error is not None:
+            raise error
 
     @staticmethod
     def _press(button):
+        """Run the deferred ``button``; close the dialog when it accepts
+        (FreeCAD took False for it meanwhile)."""
         if button() and Gui.Control.activeDialog():
             Gui.Control.closeDialog()
 ```
 
+How a panel uses it (a sketch; see `create_extend_cut_tool.py` in the same
+repository for a complete panel):
+
 ```python
 class PreviewPanel:
     def __init__(self):
-        self.gate = RecomputeGate(lambda: not self._closed)
-        self._timer = QtCore.QTimer(singleShot=True, interval=300)
-        self._timer.timeout.connect(self.update_preview)
+        self._closed = False
+        self._gate = RecomputeGate(lambda: not self._closed)
 
-    def update_preview(self):
-        if self.gate.wait(self.update_preview):
+    def update_preview(self):  # slot of the panel's preview timer
+        if self._gate.wait(self.update_preview):
             return
-        with self.gate.hold():
-            self.apply_values_to_preview()
+        with self._gate.hold():
+            ...  # set the preview objects from the fields
             self.doc.recompute()
 
     def accept(self):
-        if self.gate.defer(self.accept):
+        if self._gate.defer(self.accept):
             return False
-        ...
+        ...  # commit; the panel is closing
+        self._closed = True
+        self._gate.clear()
+        return True
 ```
 
 ## 9. Progress and long operations
