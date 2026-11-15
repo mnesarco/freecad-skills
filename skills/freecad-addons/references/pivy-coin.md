@@ -390,13 +390,15 @@ offset.units = 1.0
 
 Coin and Qt are **not thread-safe**. The rules:
 
-- `execute()` may run in a worker thread; it must not touch Coin, Qt, or the
-  view.
+- `execute()` may run on the recompute worker thread when the object opts in
+  to async recompute (`supportsAsyncRecompute`, see `document-objects.md`); it
+  must not touch Coin, Qt, or the view.
 - `updateData()`, `onChanged()`, `attach()`, and command/UI callbacks run on the
   GUI thread and may touch Coin.
-- To send data from a worker to the GUI, use a Qt signal or
-  `QtCore.QTimer.singleShot(0, callback)`. Do not call widget or Coin methods
-  directly from the worker.
+- To send data from a worker to the GUI, emit a signal of a `QObject` that
+  lives on the GUI thread, or use `QtCore.QTimer.singleShot(0, gui_object,
+  callback)` with such a context object (without one, the timer belongs to the
+  worker thread and never reaches the GUI). Do not call widget or Coin methods directly from the worker.
 - `FreeCAD.Console.Print*` is safe from worker threads.
 - Do not hold a lock while calling Coin; it may call back into Python.
 

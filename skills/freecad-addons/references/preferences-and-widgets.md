@@ -319,6 +319,116 @@ class MyTaskPanel:
 - A task panel that modifies the document must participate in the command's
   transaction or create its own.
 
+### Task panels that recompute (live preview)
+
+FreeCAD pumps Qt events while it recomputes: progress reporting
+(`Gui::SequencerBar::setProgress`) calls `processEvents()` from inside OCC
+operations. So the panel's own timers, queued slots, selection callbacks and
+dialog buttons can run *in the middle of* the panel's `doc.recompute()`. If one
+of them runs geometry (a boolean such as `Shape.cut()`, a shape query that
+computes, or a nested recompute), it can wait forever on OCC's
+`OSD_ThreadPool`, which the paused outer boolean still holds: FreeCAD freezes
+with every thread idle. Headless tests do not reproduce it, because nothing
+pumps events there.
+
+Rules:
+
+- Wrap every recompute the panel starts in a gate. While it is held, handlers
+  and timers queue their work instead of running it.
+- Never drop queued work: run it, in order, when the outermost hold ends, so the
+  panel catches up with the last value the user typed.
+- Run a deferred OK/Cancel/Apply last, after the whole queue (including work
+  queued while a queued item recomputed). Otherwise a click made before OK is
+  lost when OK closes the panel.
+- While the gate is held, `accept()` / `reject()` return `False` (the dialog
+  stays open); the deferred button closes it with `Gui.Control.closeDialog()`
+  when it succeeds.
+- Re-check that the panel is still open after each recompute before touching
+  its widgets.
+
+```python
+import contextlib
+
+
+class RecomputeGate:
+    def __init__(self, active):
+        self._active = active  # callable: is the panel still open?
+        self._depth = 0
+        self._waiting = []
+        self._button = None
+        self._releasing = False
+
+    @property
+    def held(self):
+        return self._depth > 0
+
+    @contextlib.contextmanager
+    def hold(self):
+        self._depth += 1
+        try:
+            yield
+        finally:
+            self._depth -= 1
+        if not self._depth:
+            self._release()
+
+    def wait(self, work):
+        """Queue work while held; return whether it was queued."""
+        if not self.held:
+            return False
+        if work not in self._waiting:
+            self._waiting.append(work)
+        return True
+
+    def defer(self, button):
+        """Keep the last dialog button pressed while held."""
+        if not self.held:
+            return False
+        self._button = button
+        return True
+
+    def _release(self):
+        if self._releasing:  # a nested hold ended: the outer run drains it
+            return
+        self._releasing = True
+        try:
+            while self._waiting or self._button is not None:
+                if self._waiting:
+                    work = self._waiting.pop(0)
+                else:
+                    button, self._button = self._button, None
+                    work = lambda: self._press(button)  # noqa: E731
+                if self._active():
+                    work()
+        finally:
+            self._releasing = False
+
+    @staticmethod
+    def _press(button):
+        if button() and Gui.Control.activeDialog():
+            Gui.Control.closeDialog()
+```
+
+```python
+class PreviewPanel:
+    def __init__(self):
+        self.gate = RecomputeGate(lambda: not self._closed)
+        self._timer = QtCore.QTimer(singleShot=True, interval=300)
+        self._timer.timeout.connect(self.update_preview)
+
+    def update_preview(self):
+        if self.gate.wait(self.update_preview):
+            return
+        with self.gate.hold():
+            self.apply_values_to_preview()
+            self.doc.recompute()
+
+    def accept(self):
+        if self.gate.defer(self.accept):
+            return False
+        ...
+```
+
 ## 9. Progress and long operations
 
 Use FreeCAD's progress indicator rather than a custom busy loop:
@@ -401,9 +511,14 @@ QObject` works. Keep this complexity in one file, not across the addon.
 ### UI thread bridge
 
 - All widgets and Coin scene graphs live on the GUI thread.
-- `execute()` may run in a worker thread; never touch GUI/Coin there.
-- To run a callback on the GUI thread, use `QTimer.singleShot(0, callback)` or a
-  `QObject` with a queued signal. Do not call widget methods from a worker.
+- `execute()` runs on the GUI thread unless the object opts in to async
+  recompute (see `document-objects.md`); then it must not touch GUI/Coin.
+- To run a callback on the GUI thread from another thread, emit a signal of a
+  `QObject` that lives on the GUI thread (queued connection), or use
+  `QTimer.singleShot(0, gui_object, callback)` with such a context object. A
+  context-free `QTimer.singleShot(0, callback)` uses the calling thread's event
+  loop, so from a plain worker thread it never reaches the GUI thread. Do not
+  call widget methods from a worker.
 - `FreeCAD.Console.Print*` is safe from workers.
 - Check `shiboken.isValid(obj)` (or `shiboken2` on Qt5) before using a cached
   Qt/Coin wrapper; C++ may have deleted it.
