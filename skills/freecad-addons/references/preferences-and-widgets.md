@@ -319,6 +319,176 @@ class MyTaskPanel:
 - A task panel that modifies the document must participate in the command's
   transaction or create its own.
 
+### Task panels that recompute (live preview)
+
+FreeCAD pumps Qt events while it recomputes: progress reporting
+(`Gui::SequencerBar::setProgress`) calls `processEvents()` from inside OCC
+operations. So the panel's own timers, queued slots, selection callbacks and
+dialog buttons can run *in the middle of* the panel's `doc.recompute()`. If one
+of them runs geometry (a boolean such as `Shape.cut()`, a shape query that
+computes, or a nested recompute), it can wait forever on OCC's
+`OSD_ThreadPool`, which the paused outer boolean still holds: FreeCAD freezes
+with every thread idle. Headless tests do not reproduce it, because nothing
+pumps events there.
+
+Rules:
+
+- Wrap every recompute the panel starts in a gate. While it is held, handlers
+  and timers queue their work instead of running it.
+- Never drop queued work: run it, in order, when the outermost hold ends, so the
+  panel catches up with the last value the user typed.
+- Run a deferred OK/Cancel/Apply last, after the whole queue (including work
+  queued while a queued item recomputed). Otherwise a click made before OK is
+  lost when OK closes the panel.
+- While the gate is held, `accept()` / `reject()` return `False` (the dialog
+  stays open); the deferred button closes it with `Gui.Control.closeDialog()`
+  when it succeeds.
+- Re-check that the panel is still open after each recompute before touching
+  its widgets.
+
+The gate below is the code MaxProFrame runs in three task panels, with its
+long docstrings shortened: [`recompute_gate.py`](https://github.com/sclMAX/MaxProFrame/blob/main/freecad/maxproframe/recompute_gate.py),
+tested by `tests/test_recompute_gate*.py` and `tests/test_*_recompute_gate.py`
+in the same repository on FreeCAD 1.1 and a 27.1 development build.
+
+```python
+import contextlib
+from functools import partial
+
+import FreeCADGui as Gui
+
+
+class RecomputeGate:
+    """Held while a panel recomputes; what the panel is asked to do meanwhile
+    waits for the hold to end. ``active`` tells whether the panel still runs:
+    queued work is dropped once it closed."""
+
+    def __init__(self, active):
+        self._active = active
+        self._depth = 0
+        self._waiting = []
+        self._button = None
+        # Whether the queue is being run: a hold ending meanwhile leaves what
+        # it queued to that run.
+        self._releasing = False
+
+    @property
+    def held(self):
+        return self._depth > 0
+
+    @contextlib.contextmanager
+    def hold(self):
+        """Hold the gate for the block (a recompute of the panel and its
+        follow-up); then run what waited."""
+        self._depth += 1
+        try:
+            yield
+        finally:
+            self._depth -= 1
+        if not self._depth:
+            self._release()
+
+    def wait(self, work):
+        """Whether ``work`` waits for the recompute to end; an equal work
+        queued already runs once."""
+        if not self.held:
+            return False
+        if work not in self._waiting:
+            self._waiting.append(work)
+        return True
+
+    def defer(self, button):
+        """Whether a dialog button waits; the last one pressed runs after the
+        queued work and closes the dialog when it returns True."""
+        if not self.held:
+            return False
+        self._button = button
+        return True
+
+    def clear(self):
+        """Drop what waits: the panel closed."""
+        self._waiting = []
+        self._button = None
+
+    def _release(self):
+        """Run what waited, in order, then the button, only from the outermost
+        release. A work that raises does not stop the others nor the button:
+        the first error is raised once they ran."""
+        if self._releasing:
+            return
+        self._releasing = True
+        error = None
+        try:
+            while self._waiting or self._button is not None:
+                if self._waiting:
+                    work = self._waiting.pop(0)
+                else:
+                    work, self._button = partial(self._press, self._button), None
+                if not self._active():
+                    continue
+                try:
+                    work()
+                except Exception as exception:
+                    error = error or exception
+        finally:
+            self._releasing = False
+        if error is not None:
+            raise error
+
+    @staticmethod
+    def _press(button):
+        """Run the deferred ``button``; close the dialog when it accepts
+        (FreeCAD took False for it meanwhile)."""
+        if button() and Gui.Control.activeDialog():
+            Gui.Control.closeDialog()
+```
+
+How a panel uses it (a sketch; see `create_extend_cut_tool.py` in the same
+repository for a complete panel):
+
+```python
+class PreviewPanel:
+    def __init__(self):
+        self._closed = False
+        self._gate = RecomputeGate(lambda: not self._closed)
+
+    def update_preview(self):  # slot of the panel's preview timer
+        if self._gate.wait(self.update_preview):
+            return
+        with self._gate.hold():
+            ...  # set the preview objects from the fields
+            self.doc.recompute()
+
+    def accept(self):
+        if self._gate.defer(self.accept):
+            return False
+        ...  # commit; the panel is closing
+        self._closed = True
+        self._gate.clear()
+        return True
+```
+
+#### Previews through `PreviewExtension` (FreeCAD 27+)
+
+Since [FreeCAD#29641](https://github.com/FreeCAD/FreeCAD/pull/29641) (development
+builds from August 2026, not FreeCAD 1.1) a Python feature can add
+`Part::PreviewExtensionPython` and publish its preview from
+`recomputePreview()`, without recomputing the document. When an addon targets
+those versions, prefer it for live previews: the panel no longer needs a
+`doc.recompute()` per keystroke, which removes most of the window described
+above.
+
+It does not make the gate obsolete:
+
+- Panels that preview by recomputing real document objects (the only option on
+  FreeCAD 1.1) still need it.
+- `PreviewUpdateScheduler` runs `updatePreview()` from a queued call, with no
+  check for a running recompute. Queued calls are what the progress bar's
+  `processEvents()` delivers, so a preview could start inside a recompute that
+  reports progress. Keep `recomputePreview()` free of booleans (show the tool
+  or the affected volume, as the framework's documentation suggests), so it
+  never waits on OCC's thread pool.
+
 ## 9. Progress and long operations
 
 Use FreeCAD's progress indicator rather than a custom busy loop:
@@ -401,9 +571,14 @@ QObject` works. Keep this complexity in one file, not across the addon.
 ### UI thread bridge
 
 - All widgets and Coin scene graphs live on the GUI thread.
-- `execute()` may run in a worker thread; never touch GUI/Coin there.
-- To run a callback on the GUI thread, use `QTimer.singleShot(0, callback)` or a
-  `QObject` with a queued signal. Do not call widget methods from a worker.
+- `execute()` runs on the GUI thread unless the object opts in to async
+  recompute (see `document-objects.md`); then it must not touch GUI/Coin.
+- To run a callback on the GUI thread from another thread, emit a signal of a
+  `QObject` that lives on the GUI thread (queued connection), or use
+  `QTimer.singleShot(0, gui_object, callback)` with such a context object. A
+  context-free `QTimer.singleShot(0, callback)` uses the calling thread's event
+  loop, so from a plain worker thread it never reaches the GUI thread. Do not
+  call widget methods from a worker.
 - `FreeCAD.Console.Print*` is safe from workers.
 - Check `shiboken.isValid(obj)` (or `shiboken2` on Qt5) before using a cached
   Qt/Coin wrapper; C++ may have deleted it.

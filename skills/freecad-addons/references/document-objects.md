@@ -344,9 +344,21 @@ def execute(self, obj):
     )
 ```
 
-FreeCAD 1.x can recompute documents in worker threads. `execute()` may run off
-the GUI thread. Anything that needs the GUI belongs in the ViewProvider (see
-`references/pivy-coin.md`).
+Async recompute ([FreeCAD#21292](https://github.com/FreeCAD/FreeCAD/pull/21292), in development builds since
+April 2026, enabled by default through the `EnableAsyncRecompute` preference)
+can run a recompute request on a worker thread, but only when the request
+target is worker-safe. `App::FeaturePython` objects are worker-unsafe by
+default and stay on the GUI thread. A Python proxy opts in with:
+
+```python
+def supportsAsyncRecompute(self, obj):
+    return True  # only if execute() never touches Qt, Coin or FreeCADGui
+```
+
+Opt in only when `execute()` is pure: no GUI, no view objects, no timers, no
+event loop. The GIL is held for the whole recompute, so Python code stays
+serialized, but GUI access from the worker fails. Anything that needs the GUI
+belongs in the ViewProvider (see `references/pivy-coin.md`).
 
 If a computation is expensive, cache by input values, not by wall-clock time.
 Do not leave stale derived state when an input changes.

@@ -441,7 +441,9 @@ Key rules:
   `SoCylinder` height 2 / radius 1 along Y, `SoCone` height 2 / radius 1 along
   Y, `SoCube` side 2, `SoSphere` radius 1. Use `SoTransform` to place them.
 - Update the scene graph in `updateData()` (GUI thread), never in `execute()`.
-  Document recompute may run in a worker thread; Coin is not thread-safe.
+  `execute()` may run on the recompute worker thread when the object opts in to
+  async recompute (see `references/document-objects.md`); Coin is not
+  thread-safe.
 - Copy `SbRotation` / `SbVec3f` values obtained with `getValue()` before
   mutating them; they are references to the field's internal value.
 - Batch field updates with `setValues()`; do not rebuild the whole graph for one
@@ -497,6 +499,11 @@ Rules:
 - Remove selection observers when the owning panel is destroyed.
 - Debounce high-frequency events (`setPreselection`, property changes) with a
   one-shot `QTimer` instead of `processEvents`.
+- FreeCAD itself pumps Qt events during a recompute (the progress bar), so
+  timers, queued slots, clicks and dialog buttons can run while a recompute is
+  in progress. A task panel that recomputes must not run geometry or another
+  recompute from those handlers meanwhile: queue the work and run it when the
+  recompute ends. See `references/preferences-and-widgets.md` §8.
 - Do not keep strong references to deleted documents/objects.
 - Check `shiboken.isValid()` before reusing a cached view/camera/dragger/widget.
 - View callbacks are attached with `addEventCallback`,
