@@ -468,6 +468,27 @@ class PreviewPanel:
         return True
 ```
 
+#### Previews through `PreviewExtension` (FreeCAD 27+)
+
+Since [FreeCAD#29641](https://github.com/FreeCAD/FreeCAD/pull/29641) (development
+builds from August 2026, not FreeCAD 1.1) a Python feature can add
+`Part::PreviewExtensionPython` and publish its preview from
+`recomputePreview()`, without recomputing the document. When an addon targets
+those versions, prefer it for live previews: the panel no longer needs a
+`doc.recompute()` per keystroke, which removes most of the window described
+above.
+
+It does not make the gate obsolete:
+
+- Panels that preview by recomputing real document objects (the only option on
+  FreeCAD 1.1) still need it.
+- `PreviewUpdateScheduler` runs `updatePreview()` from a queued call, with no
+  check for a running recompute. Queued calls are what the progress bar's
+  `processEvents()` delivers, so a preview could start inside a recompute that
+  reports progress. Keep `recomputePreview()` free of booleans (show the tool
+  or the affected volume, as the framework's documentation suggests), so it
+  never waits on OCC's thread pool.
+
 ## 9. Progress and long operations
 
 Use FreeCAD's progress indicator rather than a custom busy loop:
