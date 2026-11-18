@@ -1,7 +1,8 @@
 # FreeCAD agent skills
 
-OpenCode skills for FreeCAD addon development. Each skill is a directory with a
-`SKILL.md` entry point plus reference files the agent loads on demand.
+Agent skills (Claude Code, OpenCode) for FreeCAD addon development. Each skill
+is a directory with a `SKILL.md` entry point plus reference files the agent
+loads on demand.
 
 ## Skills
 
@@ -27,6 +28,22 @@ quality. Not for FreeCAD core C++ work or single-file macros.
 
 ## Install
 
+### Claude Code
+
+This repo is a Claude Code plugin marketplace (`freecad-skills`) that provides
+the `freecad-addons` plugin:
+
+```text
+/plugin marketplace add mnesarco/freecad-skills
+/plugin install freecad-addons@freecad-skills
+```
+
+On Claude Code 2.1.275 or later, a single command does both steps:
+
+```text
+/plugin install freecad-addons --marketplace mnesarco/freecad-skills
+```
+
 ### Opencode or similar
 
 ```bash
@@ -47,6 +64,9 @@ Restart OpenCode; the skill is picked up from its `SKILL.md` frontmatter.
 ## Layout
 
 ```text
+.claude-plugin/
+├─ marketplace.json
+└─ plugin.json
 skills/
 └─ freecad-addons/
    ├─ SKILL.md

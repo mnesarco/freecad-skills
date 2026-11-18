@@ -1,0 +1,29 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "freecad-skills",
+  "owner": {
+    "name": "Frank Martínez",
+    "url": "https://github.com/mnesarco"
+  },
+  "metadata": {
+    "description": "Agent skills for FreeCAD addon development.",
+    "version": "1.0.0"
+  },
+  "plugins": [
+    {
+      "name": "freecad-addons",
+      "source": "./",
+      "description": "FreeCAD 1.1+ addon development: workbenches, commands, preferences, translations, FeaturePython objects, observers, Pivy/Coin3D view providers, packaging, testing and release quality.",
+      "version": "1.0.0",
+      "author": {
+        "name": "Frank Martínez",
+        "url": "https://github.com/mnesarco"
+      },
+      "homepage": "https://github.com/mnesarco/freecad-skills",
+      "repository": "https://github.com/mnesarco/freecad-skills",
+      "license": "MIT",
+      "keywords": ["freecad", "cad", "addon", "workbench", "python", "pivy", "coin3d"],
+      "category": "development"
+    }
+  ]
+}

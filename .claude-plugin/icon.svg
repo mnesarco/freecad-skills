@@ -1,0 +1,158 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg
+   width="512"
+   height="512"
+   viewBox="0 0 512 512"
+   version="1.1"
+   id="svg10"
+   sodipodi:docname="icon.svg"
+   inkscape:version="1.4.4 (dcaf3e7d9e, 2026-05-05)"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg">
+  <defs
+     id="defs10" />
+  <sodipodi:namedview
+     id="namedview10"
+     pagecolor="#ffffff"
+     bordercolor="#000000"
+     borderopacity="0.25"
+     inkscape:showpageshadow="2"
+     inkscape:pageopacity="0.0"
+     inkscape:pagecheckerboard="0"
+     inkscape:deskcolor="#d1d1d1"
+     inkscape:zoom="0.57861328"
+     inkscape:cx="146.03882"
+     inkscape:cy="325.7789"
+     inkscape:window-width="3440"
+     inkscape:window-height="1376"
+     inkscape:window-x="0"
+     inkscape:window-y="0"
+     inkscape:window-maximized="1"
+     inkscape:current-layer="svg10" />
+  <title
+     id="title1">FreeCAD skills</title>
+  <!-- FreeCAD logo (official artwork, rescaled) -->
+  <!-- Bot badge -->
+  <!-- antenna -->
+  <!-- ears -->
+  <!-- head -->
+  <!-- visor -->
+  <!-- mouth -->
+  <g
+     id="g11"
+     transform="translate(0.3840626,17.679438)">
+    <g
+       transform="matrix(16,0,0,16,8,20)"
+       id="g4">
+      <path
+         fill="#418fde"
+         fill-rule="evenodd"
+         d="m 22,3.9997423 -3.999742,4.0002581 h -8 V 10.999806 H 14 v 4.000259 h -3.999742 v 4.999678 L 5.9999997,24 h 4.0503843 c 0.30326,-1e-6 0.571883,-0.195269 0.66559,-0.48369 l 0.723985,-2.22828 c 0.06925,-0.213087 0.236489,-0.379833 0.449583,-0.449065 l 0.556553,-0.180868 c 0.213108,-0.06926 0.446577,-0.03248 0.627866,0.09922 l 1.894968,1.377173 c 0.245331,0.178232 0.57787,0.178229 0.823203,0 l 1.698598,-1.234547 c 0.245363,-0.178242 0.347963,-0.493948 0.254247,-0.782378 l -0.723984,-2.22828 c -0.06926,-0.213109 -0.03197,-0.446575 0.09974,-0.627866 l 0.344164,-0.473355 c 0.131697,-0.181276 0.34179,-0.288856 0.565855,-0.28887 l 2.343001,5.1e-4 c 0.303278,10e-6 0.571885,-0.19577 0.66559,-0.484207 l 0.649054,-1.996771 c 0.0937,-0.288413 -0.0089,-0.60465 -0.254247,-0.782895 L 19.538664,11.858666 C 19.357381,11.726957 19.250306,11.516889 19.250311,11.292812 V 10.70732 c 1.9e-5,-0.224072 0.107062,-0.434681 0.288353,-0.566372 L 21.711646,8.5622376 C 21.892924,8.4305313 21.999999,8.219938 22,7.9958659 Z"
+         id="path1" />
+      <path
+         fill="#ff585d"
+         fill-rule="evenodd"
+         d="m 18,0 -4,4 h 4 V 8 L 22,4 V 0 Z M 6,16 2,20 v 4 h 4 l 4,-4 H 6 Z"
+         id="path2" />
+      <path
+         fill="#cb333b"
+         fill-rule="evenodd"
+         d="M 6,0 2,4 V 20 L 6,16 V 4 h 8 l 4,-4 z"
+         id="path3" />
+      <path
+         fill="#fefefe"
+         fill-rule="evenodd"
+         d="M 5.9999997,19.999743 H 10.000258 V 15.000065 H 14 V 10.999806 H 10.000258 V 8.0000004 h 8 V 3.9997423 H 5.9999997 Z"
+         id="path4" />
+    </g>
+    <g
+       id="g10"
+       transform="matrix(1.2533421,0,0,1.2533421,-140.39907,-154.98982)"
+       style="stroke-width:0.797867">
+      <circle
+         cx="384"
+         cy="384"
+         r="104"
+         fill="#22303f"
+         id="circle5"
+         style="stroke-width:0.797867" />
+      <rect
+         x="378"
+         y="318"
+         width="12"
+         height="28"
+         rx="6"
+         fill="#fefefe"
+         id="rect5"
+         style="stroke-width:0.797867" />
+      <circle
+         cx="384"
+         cy="314"
+         r="13"
+         fill="#ff585d"
+         id="circle6"
+         style="stroke-width:0.797867" />
+      <rect
+         x="310"
+         y="370"
+         width="16"
+         height="40"
+         rx="7"
+         fill="#418fde"
+         id="rect6"
+         style="stroke-width:0.797867" />
+      <rect
+         x="442"
+         y="370"
+         width="16"
+         height="40"
+         rx="7"
+         fill="#418fde"
+         id="rect7"
+         style="stroke-width:0.797867" />
+      <rect
+         x="322"
+         y="342"
+         width="124"
+         height="96"
+         rx="26"
+         fill="#fefefe"
+         id="rect8"
+         style="stroke-width:0.797867" />
+      <rect
+         x="338"
+         y="360"
+         width="92"
+         height="44"
+         rx="20"
+         fill="#22303f"
+         id="rect9"
+         style="stroke-width:0.797867" />
+      <circle
+         cx="363"
+         cy="382"
+         r="11"
+         fill="#418fde"
+         id="circle9"
+         style="stroke-width:0.797867" />
+      <circle
+         cx="405"
+         cy="382"
+         r="11"
+         fill="#418fde"
+         id="circle10"
+         style="stroke-width:0.797867" />
+      <rect
+         x="364"
+         y="416"
+         width="40"
+         height="8"
+         rx="4"
+         fill="#cb333b"
+         id="rect10"
+         style="stroke-width:0.797867" />
+    </g>
+  </g>
+</svg>
