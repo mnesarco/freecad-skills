@@ -331,6 +331,9 @@ describes one change, keyed by `append`, `insert`, or `remove`.
 
 - Manipulators run on **every workbench activation**, not once at startup. Keep
   them cheap.
+- Register the manipulator while `init_gui.py` is imported, not later. Menus of
+  the already-active workbench are not rebuilt when a manipulator is added
+  afterwards, so a deferred registration only shows up after a workbench switch.
 - Nothing is passed in; determine the current workbench yourself. Do not use
   `Gui.activeWorkbench().name()` during a core workbench's first activation
   (it can raise). Use identity lookup:
