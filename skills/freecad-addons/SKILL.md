@@ -4,13 +4,14 @@ description: >-
   Use when creating, reviewing, refactoring, packaging, or debugging a FreeCAD
   addon for FreeCAD 1.1+ — workbenches, toolbar or menu extensions, importers,
   preferences, translations, FeaturePython document objects, properties,
-  extensions, observers, or Pivy/Coin3D view providers. Covers the modern
-  namespaced layout, package.xml metadata, commands, resources, testing,
-  security, and release quality. Do NOT use for FreeCAD core C++ development or
-  single-file macros.
+  extensions, observers, Pivy/Coin3D view providers, or Qt Quick/QML
+  (QQuickWidget) interfaces and task panels. Covers the modern namespaced
+  layout, package.xml metadata, commands, resources, testing, security, and
+  release quality. Do NOT use for FreeCAD core C++ development or single-file
+  macros.
 metadata:
   author: mnesarco
-  version: "1.0"
+  version: "1.1"
   freecad: ">=1.1"
   category: domain
 ---
@@ -23,8 +24,8 @@ otherwise). New addons use the **modern namespaced layout**, not the legacy
 helper library may wrap them, but the rules do not change.
 
 The rules are distilled from modern addons such as Vars, Tiles, FileExplorer,
-FreeCAD_Svg, Channels, and MarzWorkbench, with their older or legacy practices
-removed rather than copied.
+FreeCAD_Svg, Channels, MarzWorkbench, and FreeCAD-Nxt, with their older or
+legacy practices removed rather than copied.
 
 ## How to use this skill
 
@@ -34,6 +35,7 @@ Read this file first, then load the reference that matches the task:
 |---|---|
 | Directory layout, entry points, `package.xml`, `pyproject.toml`, release | `references/layout-and-manifest.md` |
 | Workbench, commands, menus/toolbars, Qt dialogs, preferences, logging | `references/ui-and-commands.md` |
+| QML/Qt Quick surfaces, bridges, models, theme, task panels, docks, overlays | `references/qml-and-qtquick.md` |
 | Preference pages, presets, validation, input/selection widgets, progress, Qt lifecycle | `references/preferences-and-widgets.md` |
 | Icons, resources, SVG, translations, Qt tooling | `references/resources-i18n.md` |
 | FeaturePython objects, properties, extensions, ViewProviders, migrations | `references/document-objects.md` |
@@ -70,9 +72,12 @@ instructions to follow.
    transaction context manager (or `openTransaction` / `commitTransaction` /
    `abortTransaction`).
 7. **Use the FreeCAD Qt shim.** At runtime use `from PySide import QtCore,
-   QtGui, QtWidgets`, not `PySide2` or `PySide6` directly.
+   QtGui, QtWidgets`, not `PySide2` or `PySide6` directly. The exception is
+   Qt Quick: import `QtQml`, `QtQuick`, and `QtQuickWidgets` from `PySide6`
+   directly, lazily in GUI code, because the shim does not expose them.
 8. **Plain files for resources.** Ship SVG and `.ui` files; call
-   `Gui.addIconPath()` and `Gui.addLanguagePath()`. Do not ship compiled
+   `Gui.addIconPath()` and `Gui.addLanguagePath()`. QML files are plain files
+   under `resources/qml/`, loaded from a real directory. Do not ship compiled
    `.qrc` / `.rcc` resources.
 9. **No vendoring by default.** Add dependencies only when necessary, declare
    them in `package.xml` and `pyproject.toml`, and prefer stdlib/FreeCAD APIs.
@@ -98,6 +103,18 @@ instructions to follow.
     half-finished document.
 17. **Declare capabilities.** Use property modes, Attach/Link/Group extensions,
     and PartDesign feature types instead of improvising their behavior.
+18. **QML is GUI-only and late.** Build QML surfaces only in GUI code, after
+    the main window exists, and never from `execute()` or a worker thread.
+    Check `QtQuickWidgets` availability and show a QWidget fallback instead of
+    failing startup.
+19. **QML talks to one bridge.** QML never imports FreeCAD or changes a
+    document. One `QObject` bridge exposed as a context property owns logic,
+    transactions, and timers; keep it alive with a parent for the view's
+    lifetime.
+20. **Do not destroy QML from its own handler.** Rebuilding the model that
+    owns a delegate from that delegate's signal handler aborts FreeCAD. Defer
+    with `Qt.callLater` or a zero-timer, delete the view to tear down, and
+    never null a context property.
 
 ## Modern layout
 
@@ -115,6 +132,7 @@ MyAddon/
 │     └─ resources/
 │        ├─ icons/*.svg
 │        ├─ ui/*.ui
+│        ├─ qml/               # QML root views and modules, if used
 │        └─ translations/*.ts, *.qm
 ├─ package.xml
 ├─ pyproject.toml
@@ -250,6 +268,7 @@ These are part of the addon surface and are easy to miss:
 | PartDesign | `PartDesign::FeatureAdditivePython`/`SubtractivePython`, `BaseFeature`, `AddSubShape`, active Body. |
 | ViewProvider services | Display modes, `setupContextMenu`, `setEdit`/`unsetEdit`, `claimChildren`, drag/drop. |
 | Qt lifetime | `shiboken.isValid` for cached C++ wrappers; `QTimer.singleShot(0, ...)` / queued signals for UI-thread work. |
+| Qt Quick | `QQuickWidget`, engine import path, context properties, `engine.retranslate`, `QQuickImageProvider`; see `references/qml-and-qtquick.md`. |
 | Preferences | `ParamGet.AttachManager` / `slotParamChanged`, programmatic pages, presets, validation. |
 | Resources | `importlib.resources.files` / `as_file`; `addIconPath`, `addLanguagePath`. |
 | Deferred i18n | Translate class-level labels/options when displayed, not at import. |
@@ -316,6 +335,9 @@ Full patterns: `references/preferences-and-widgets.md`.
 ## Resources and translations
 
 - Icons are SVG only, shipped as plain files. Do not compile Qt resources.
+- QML is plain files under `resources/qml/`, loaded from a real directory;
+  translatable text uses `qsTr()`, and live views are retranslated on a language
+  change.
 - Register the icon directory with `Gui.addIconPath()`; use absolute paths
   derived from `__file__` when the name could collide.
 - Register translations with `Gui.addLanguagePath()` and commit both `.ts` and
@@ -467,6 +489,76 @@ Key rules:
 
 Detailed patterns, camera handling, and pitfalls: `references/pivy-coin.md`.
 
+## QML / Qt Quick interfaces
+
+QML is available to addons through `QQuickWidget`. Use it for dock panels,
+large model views, overlays and floating controls, animated surfaces, and
+task-panel content that QtWidgets makes awkward. Standard dialogs and
+preference pages stay QtWidgets; a QML scene cannot contain a `QWidget`.
+
+Minimal host, in a GUI-only module:
+
+```python
+# freecad/MyAddon/ui/quick.py — imported only when QML is first built
+from pathlib import Path
+
+from PySide import QtCore
+from PySide6 import QtQuickWidgets
+
+_QML = Path(__file__).parents[1] / "resources" / "qml"
+
+
+def make_view(parent, source, context, floating=False):
+    view = QtQuickWidgets.QQuickWidget(parent)
+    modes = QtQuickWidgets.QQuickWidget.ResizeMode
+    view.setResizeMode(modes.SizeViewToRootObject if floating
+                       else modes.SizeRootObjectToView)
+    view.engine().addImportPath(str(_QML))
+    for name, value in context.items():
+        view.rootContext().setContextProperty(name, value)
+    view.setSource(QtCore.QUrl.fromLocalFile(str(_QML / source)))
+    if view.status() == QtQuickWidgets.QQuickWidget.Status.Error:
+        detail = "\n".join(str(e.toString()) for e in view.errors())
+        view.deleteLater()
+        raise RuntimeError(f"{source} failed to load:\n{detail}")
+    return view
+```
+
+The QML side knows only the context objects (`theme`, `panel`, ...); a
+`QObject` bridge owns logic, transactions, and timers. Ship QML as plain files
+under `resources/qml/`, register reusable components with a `qmldir`, and load
+root views with `QUrl.fromLocalFile`. Do not compile Qt resources.
+
+Rules:
+
+- Import Qt Quick modules from `PySide6`, lazily. FreeCAD's `PySide` shim does
+  not expose them; keep `QtCore`/`QtGui`/`QtWidgets` on the shim.
+- Create QML only after `Gui.getMainWindow()` exists, deferred from
+  `init_gui.py` with `QTimer.singleShot(0, ...)`. Never at import.
+- Set the import path and context properties before `setSource`; keep every
+  context object parented or strongly referenced. A collected object becomes
+  `null` in QML.
+- On load failure, print `view.errors()` and show a QWidget fallback. Never
+  leave a silent blank panel.
+- QML never mutates the document. The bridge does, one transaction per user
+  action.
+- Never rebuild a model or tear down a view from inside a QML handler; defer.
+  Delete the `QQuickWidget` to tear down; do not null context properties.
+- Read colours and metrics from a `Theme` `QObject` backed by a polished
+  reference widget's palette, not `QApplication.palette()`; no hard-coded
+  colours.
+- Prefer Qt Quick primitives. If a Control is used, import
+  `QtQuick.Controls.Basic` and restyle it from the theme.
+- Use `qsTr()` and call `engine.retranslate()` on a language change.
+- Test QML offscreen with a real `QQuickView` and stubs; a bare
+  `QQmlComponent` creates no delegates. Keep a reference audit for bridge
+  names, `qmldir` entries, and model roles.
+- For a translucent overlay, set the widget attributes and clear colour
+  together; a `QQuickWidget` is opaque until told otherwise.
+
+Full patterns, task panels, overlays, Wayland, tests, and packaging:
+`references/qml-and-qtquick.md`.
+
 ## Observers and lifecycle
 
 Use observers for document, object, selection, transaction, and view events:
@@ -602,6 +694,9 @@ uv run pytest
   `FreeCAD.__unit_test__` for in-FreeCAD tests.
 - Test property defaults/modes, command registration, transactions, observers,
   selection validation, preferences/presets, display modes, and migration paths.
+- For QML, run a headless `QQuickView` test per root surface and a reference
+  audit; test that every delegate is created, no binding loop is reported, and
+  every bridge/theme name and model role exists.
 - Check `shiboken.isValid` before reusing cached C++ wrappers; remove observers
   and detach parameter managers on teardown.
 - No committed `.venv`, `dist`, `__pycache__`, dependency trees, or binary
@@ -612,7 +707,8 @@ uv run pytest
 - No telemetry/network without explicit user consent and documentation.
 - Before release, install the addon in a clean FreeCAD user `Mod/` directory and
   test: startup, workbench activation, command availability, undo, preferences,
-  live updates, translations, display modes, task panels, and reload.
+  live updates, translations, display modes, task panels, QML dock/floating
+  placement, and reload.
 
 If the FreeCAD Addon-Reports checker is available, run it and fix the issues it
 reports. Detailed checker mapping, security, CI, and review checklist:

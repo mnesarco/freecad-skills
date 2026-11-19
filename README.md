@@ -10,14 +10,16 @@ loads on demand.
 
 Use when creating, reviewing, refactoring, packaging, or debugging a FreeCAD
 addon: workbenches, commands, preferences, translations, FeaturePython document
-objects, extensions, observers, and Pivy/Coin3D view providers. Covers the
-modern namespaced layout, `package.xml` metadata, testing, security, and release
-quality. Not for FreeCAD core C++ work or single-file macros.
+objects, extensions, observers, Pivy/Coin3D view providers, and Qt Quick/QML
+interfaces and task panels. Covers the modern namespaced layout, `package.xml`
+metadata, testing, security, and release quality. Not for FreeCAD core C++ work
+or single-file macros.
 
 | Reference | Contents |
 |---|---|
 | `layout-and-manifest.md` | Directory layout, entry points, `package.xml`, `pyproject.toml`, release |
 | `ui-and-commands.md` | Workbench, commands, menus/toolbars, Qt dialogs, logging |
+| `qml-and-qtquick.md` | QML/Qt Quick hosting, bridges, models, theme, task panels, docks, overlays |
 | `preferences-and-widgets.md` | Preference pages, presets, validation, input widgets, progress |
 | `resources-i18n.md` | Icons, SVG, translations, Qt tooling |
 | `document-objects.md` | FeaturePython objects, properties, extensions, ViewProviders, migrations |

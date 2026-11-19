@@ -157,6 +157,12 @@ widget.destroyed.connect(lambda *_: Gui.Selection.removeObserver(observer))
 
 This avoids a callback into a deleted Qt widget.
 
+A QML surface follows the same rule with its bridge as the owner. The bridge
+holds document/selection observers and timers, and the host calls its teardown
+before deleting the `QQuickWidget`. Connect the view's `destroyed` signal if
+the panel can be destroyed without the host's own `close` path; never leave a
+bridge observing a document after its view is gone.
+
 ### Typed, ordered selection
 
 A robust command validates the selection before doing work:

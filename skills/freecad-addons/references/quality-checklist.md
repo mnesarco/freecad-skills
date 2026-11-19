@@ -193,6 +193,29 @@ Add focused tests for the parts that fail silently:
 - Task panel: open/accept/reject closes the dialog and resets edit mode.
 - Serialization: save/reopen retains the expected state.
 
+### QML tests
+
+Run QML tests offscreen, without FreeCAD, against a real `QQuickView`:
+
+```bash
+QT_QPA_PLATFORM=offscreen python tests/test_panel_qml.py
+```
+
+- Install a Qt message handler and fail on `binding loop`, `is not defined`,
+  `Cannot read property`, `TypeError`, `ReferenceError`, and `required
+  property`.
+- Load every root view; check `view.status()` and `view.errors()`. Show the
+  view and let real time pass (animations use wall-clock time).
+- Stub the bridge and theme from the real classes' properties, slots, and role
+  names; keep the stubs in sync so a deleted API fails the test.
+- Test delegate creation, control-to-bridge calls, and the geometry the user
+  notices.
+- Add a no-Qt audit: every QML component is registered in a `qmldir` and
+  imported; every `bridge.*` / `theme.*` name exists; every delegate
+  `required property` matches a model role.
+- Run `qmllint` if available, and include `.qml` files in `lupdate`. Keep both
+  checks: lint does not find runtime binding loops.
+
 ### CI steps
 
 A minimal CI pipeline:
@@ -205,6 +228,7 @@ uv run bandit -r freecad/
 uv run codespell
 uv run pytest
 # optional: validate package.xml, build zip, run freecadcmd tests
+# QML addons: run the offscreen QML tests and the reference audit too
 ```
 
 If the addon declares a range of FreeCAD versions, test the oldest and newest
@@ -221,6 +245,10 @@ supported versions. Do not claim compatibility you have not tested.
 - Opening an old document with custom objects.
 - Display modes switch correctly; context menu actions work.
 - Edit/task panel opens, accepts, rejects, and resets edit mode.
+- QML dock/floating panel opens on first use, restores placement, and survives
+  a theme and language switch.
+- QML overlay hit testing, keyboard focus, popups on Wayland, and repaint
+  behind the panel work on the target platform.
 - Drag/drop updates the group and is undoable.
 - Observers stop firing after their panel/tool is closed.
 - Progress indicator stops on success and on error.
@@ -315,7 +343,21 @@ rule. Rank by impact.
 - [ ] No `processEvents()` in recompute/transactions.
 - [ ] Widgets are parented to the main window.
 - [ ] No hardcoded colors/fonts; SVG icons.
-- [ ] Runtime imports use `PySide`, not `PySide2`/`PySide6`.
+- [ ] Runtime imports use `PySide`, not `PySide2`/`PySide6`, except
+      `QtQml`/`QtQuick`/`QtQuickWidgets`, which come lazily from `PySide6`.
+- [ ] QML is created only in GUI code after the main window exists; load
+      errors show a fallback, not a blank panel.
+- [ ] One bridge per QML surface; QML never changes documents or owns
+      transactions; context objects stay alive.
+- [ ] No model rebuild or view teardown from a QML handler; no context
+      property is nulled; the view is deleted instead.
+- [ ] QML models are flat with role names, diffed rebuilds, targeted
+      `dataChanged` after state changes.
+- [ ] QML colours/metrics come from a live palette-backed theme; Controls, if
+      used, are `QtQuick.Controls.Basic` and restyled.
+- [ ] `qsTr()` wraps QML text; `engine.retranslate()` runs on language change.
+- [ ] QML tests load real `QQuickView`s offscreen and the reference audit
+      passes.
 - [ ] Workbench/manipulator changes are scoped and prefixed.
 - [ ] Preferences use `Gui::Pref*` or a programmatic page plus `ParamGet`, with
       defaults; presets and validation are correct; live-update managers detach.
@@ -354,6 +396,8 @@ rule. Rank by impact.
 - [ ] Tests cover non-trivial logic and migrations.
 - [ ] No `eval`/`exec` on untrusted input; AI code execution has consent and a
       transaction.
+- [ ] QML loads only files shipped with the addon; no JavaScript `eval` or
+      `Qt.createQmlObject` on untrusted input.
 - [ ] XML/SVG parsing is hardened where input is untrusted.
 - [ ] subprocess uses argument lists; no shell injection.
 - [ ] Network access is explicit, documented, consented.
@@ -373,7 +417,7 @@ as precedent:
 | `manifest.ini` | Legacy metadata, superseded by `package.xml`; do not add it to a modern addon | `package.xml` |
 | `setup.py` | Legacy packaging | `pyproject.toml` + standard tools |
 | `sys.path.append(...)` | Namespace collisions, install-order bugs | Relative imports in `freecad/<Mod>/` |
-| `.qrc` / `.rcc` / `pyside6-rcc` | Tied to the Qt major version | Plain SVG + `Gui.addIconPath()` |
+| `.qrc` / `.rcc` / `pyside6-rcc` | Tied to the Qt major version | Plain SVG + `Gui.addIconPath()`; plain QML under `resources/qml/` |
 | Heavy imports or heavyweight setup at module scope | Slows every FreeCAD startup | Defer to `Initialize()` / `Activated()`; keep `addCommand` registration lightweight |
 | `QApplication.processEvents()` in recompute/transaction | Re-entrancy, invalidated objects, crashes | Task panel / chunked work / progress dialog |
 | `__del__` for observers or critical cleanup | Not guaranteed to run; late shutdown crashes | Explicit `removeObserver` / lifecycle methods |
@@ -385,8 +429,13 @@ as precedent:
 | Saving preferences before validating | Partial/invalid configuration | Validate all, then write all |
 | Display mode not registered/default mismatch | Blank view or wrong mode | `addDisplayMode` for every mode; default in the list |
 | Group/dropdown command without sub-commands | Dead toolbar/menu entry | Register sub-commands and `GetCommands`/`GetDefaultCommand` |
-| Runtime `PySide2` / `PySide6` imports | Breaks across FreeCAD Qt builds | `from PySide import ...` |
-| Hardcoded colors/fonts/pixel sizes | Breaks dark mode, themes, HiDPI | Palette, layouts, SVG icons |
+| Runtime `PySide2` / `PySide6` imports | Breaks across FreeCAD Qt builds | `from PySide import ...`; `PySide6` only for `QtQml`/`QtQuick`/`QtQuickWidgets`, lazily |
+| QML built at import or in `InitGui` | Main window missing; startup cost | Deferred `QTimer.singleShot(0, ...)` creation |
+| QApplication palette used for QML | Ignores FreeCAD's stylesheet | Palette from a polished reference widget |
+| Hardcoded colors/fonts/pixel sizes | Breaks dark mode, themes, HiDPI | Palette, layouts, SVG icons; QML theme object |
+| Nulling QML context properties to tear down | Bindings re-evaluate against null | Delete the `QQuickWidget` |
+| Model reset or rebuild from a delegate handler | `qFatal`; FreeCAD exits | `Qt.callLater` / zero-timer |
+| Building QML in a bare `QQmlComponent` test | No delegates, false pass | Offscreen `QQuickView` with `show()` |
 | Duplicated version strings | Drift between manifest, package, and UI | One source of truth + build sync |
 | Vendored helper library | Index policy discourages it; stale/security risk | Declared dependency or isolated `vendor/` with a strong reason |
 | `exec`/`eval` of user code without approval | Arbitrary code execution | Show code, require consent, run in one transaction |
@@ -397,12 +446,15 @@ as precedent:
 When reporting review findings:
 
 - **HIGH** — install/startup broken; data loss; security issue; saved documents
-  fail to load; manifest invalid or branch mismatch; root/freecad `__init__.py`.
+  fail to load; manifest invalid or branch mismatch; root/freecad `__init__.py`;
+  a QML model/view rebuilt from its own handler (FreeCAD exits); a live QML
+  context object that can be collected.
 - **MEDIUM** — command doesn't work; undo broken; heavy startup cost; UI blocks
   or crashes; broken translations; missing migration; Coin accessed from
-  `execute()`.
+  `execute()`; QML built at import, blank QML on a load error, wrong theme
+  palette, or no `engine.retranslate()` on a language change.
 - **LOW** — icon size/format; missing docs; style/consistency; performance
-  polish.
+  polish; QML control not restyled to the theme.
 
 A review is not a rewrite request. Fix the smallest complete set of issues that
 makes the addon correct, safe, and maintainable.

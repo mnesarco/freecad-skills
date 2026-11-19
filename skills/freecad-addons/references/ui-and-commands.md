@@ -375,8 +375,12 @@ Use FreeCAD's Qt shim at runtime:
 from PySide import QtCore, QtGui, QtWidgets
 ```
 
-Do **not** import `PySide2` or `PySide6` in runtime code. The shim maps to the Qt
-binding FreeCAD was built with and survives a Qt major-version bump.
+Do **not** import `PySide2` or `PySide6` for these modules. The shim maps to the
+Qt binding FreeCAD was built with and survives a Qt major-version bump.
+
+The one exception is Qt Quick. FreeCAD's `PySide` shim does not expose
+`QtQml`, `QtQuick`, or `QtQuickWidgets`; import those from `PySide6` directly,
+lazily in GUI code. See `references/qml-and-qtquick.md`.
 
 For type checking, import `PySide6` inside `TYPE_CHECKING`:
 
@@ -462,6 +466,10 @@ Gui.Control.showDialog(MyTaskPanel())
 Use task panels for iterative work where the user needs to see the 3D view.
 `Gui.Control.activeDialog()` tells you whether a task panel is open;
 `Gui.ActiveDocument.resetEdit()` leaves edit mode cleanly.
+
+A `QQuickWidget` is a valid `form`; a QML task panel is built the same way,
+with the QML content fitted to the dialog and the transaction handled in
+Python. See `references/qml-and-qtquick.md` §9.
 
 ### Dock widgets
 
@@ -656,7 +664,13 @@ Gui.getMainWindow().statusBar().showMessage(
 - Using a bare `QDialog` with no parent — it can disappear behind FreeCAD.
 - Calling `QApplication.processEvents()` during recompute — re-entrancy.
 - Touching widgets or Coin nodes from a worker thread.
-- Using `PySide6` directly at runtime — breaks on Qt5 builds.
+- Using `PySide6` directly for `QtCore`/`QtGui`/`QtWidgets` — breaks on future
+  Qt builds. It is correct only for `QtQml`/`QtQuick`/`QtQuickWidgets`, which
+  the shim does not expose.
+- Building QML at import time or before the main window exists.
+- Putting FreeCAD logic in QML instead of a bridge object.
+- Nulling QML context properties or resetting a model from inside a QML
+  handler instead of deleting the view / deferring the change.
 - Hardcoding colors/fonts — breaks themes and dark mode.
 - Adding commands to core menus globally at import — use a manipulator and scope
   it to the intended workbench.

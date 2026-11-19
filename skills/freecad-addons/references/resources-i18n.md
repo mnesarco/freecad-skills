@@ -17,6 +17,12 @@ freecad/MyAddon/
 │  │  └─ preferences-myaddon.svg
 │  ├─ ui/
 │  │  └─ preferences.ui
+│  ├─ qml/
+│  │  ├─ MyPanel.qml
+│  │  └─ MyAddon/
+│  │     └─ Controls/
+│  │        ├─ qmldir
+│  │        └─ Chip.qml
 │  ├─ translations/
 │  │  ├─ MyAddon.ts
 │  │  ├─ MyAddon_de.ts
@@ -175,6 +181,9 @@ Consequences:
 - In `.ui` files, do not use `:/icons/foo.svg` paths. Set icons in Python after
   `FreeCADGui.PySideUic.loadUi()`.
 - Do not rely on `QResource` registration for addon assets.
+- QML files are also plain files. Load them from `resources/qml/` with
+  `QUrl.fromLocalFile` and an engine import path; do not compile them into a
+  resource bundle or a Python module.
 
 ### Manifest icon
 
@@ -225,6 +234,25 @@ label = translate("MyAddon", some_variable)
 # Extracted now, translated later by FreeCAD:
 MENU_TEXT = QT_TRANSLATE_NOOP("MyAddon", "Do thing")
 ```
+
+### QML text
+
+Use `qsTr("literal")` in `.qml` files. The translation context is the QML
+file's base name, so renaming a file changes its context and loses existing
+translations.
+
+- `pyside6-lupdate` scans `.qml` files like `.py` files; include them in the
+  update/build commands and commit the resulting `.ts` / `.qm`.
+- FreeCAD installs its translator application-wide, so `qsTr` works once
+  `Gui.addLanguagePath()` and `Gui.updateLocale()` have run.
+- FreeCAD can change language while it runs. On `QEvent.LanguageChange`, call
+  `view.engine().retranslate()` on every live QML view (or route it through one
+  i18n helper). Do not cache translated strings in Python models without
+  refreshing them too.
+- Do not build a sentence from translated fragments; translate the whole
+  sentence with `%1` placeholders.
+
+Details: `references/qml-and-qtquick.md` §7–8.
 
 ### Deferred translation
 
@@ -338,12 +366,13 @@ environment:
 uv add --dev PySide6
 ```
 
-Qt 6 `lupdate` handles `.py` and `.ui` files in one pass:
+Qt 6 `lupdate` handles `.py`, `.ui`, and `.qml` files in one pass:
 
 ```bash
 uv run pyside6-lupdate \
   freecad/MyAddon/**/*.py \
   freecad/MyAddon/resources/ui/*.ui \
+  freecad/MyAddon/resources/qml/**/*.qml \
   -ts freecad/MyAddon/resources/translations/MyAddon.ts
 ```
 
@@ -436,6 +465,9 @@ original. Inspect the `.ts` file if a translation does not appear.
 - [ ] Icons are SVG, under 16 kB for the manifest icon.
 - [ ] `Gui.addIconPath()` registers the icon directory.
 - [ ] No `.qrc`, `.rcc`, `pyside6-rcc`, or `:/...` paths in `.ui` files.
+- [ ] QML is shipped as plain files under `resources/qml/`, not compiled.
+- [ ] `qsTr()` wraps QML text; `.qml` files are included in `lupdate`.
+- [ ] Live QML views call `engine().retranslate()` on a language change.
 - [ ] Resources are under `freecad/<Mod>/resources/`.
 - [ ] Runtime paths use `Path(__file__)`, not the current working directory.
 - [ ] User data goes to `App.getUserAppDataDir()`, not the addon directory.

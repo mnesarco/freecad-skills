@@ -290,6 +290,26 @@ PartDesign shape logic must respect `Placement`, `BaseFeature`, and
 `AddSubShape`; do not assign a raw shape and ignore those. See
 `references/document-objects.md`.
 
+## Qt Quick (GUI only)
+
+Qt Quick modules come from `PySide6`; `QtCore`/`QtGui`/`QtWidgets` come from
+the `PySide` shim. See `references/qml-and-qtquick.md`.
+
+| API | Use |
+|---|---|
+| `QtQuickWidgets.QQuickWidget(parent)` | Host QML in a dock, task panel, or toolbar. |
+| `view.engine().addImportPath(path)` | Add the QML module root; do it before `setSource`. |
+| `view.rootContext().setContextProperty(name, obj)` | Expose a bridge/theme; set before `setSource`, keep a parent. |
+| `view.setSource(QUrl.fromLocalFile(path))` | Load a root QML file. |
+| `view.status()` / `view.errors()` | Detect and report a failed load. |
+| `view.engine().retranslate()` | Re-evaluate `qsTr()` after a language change. |
+| `view.engine().addImageProvider(id, provider)` | Serve live icons to QML; the engine takes ownership. |
+| `QQuickImageProvider.requestPixmap` | Render an icon on request. |
+| `QAbstractListModel.roleNames()` | Map role ids to delegate property names. |
+| `QAbstractListModel.beginInsertRows` / `beginRemoveRows` / `dataChanged` | Update a list model without resetting it. |
+| `QQuickView` | Offscreen test harness; creates a real scene and delegates. |
+| `QSG_RHI_BACKEND` environment variable | Force a scene-graph backend before the first QML surface. |
+
 ## Testing
 
 | API | Use |

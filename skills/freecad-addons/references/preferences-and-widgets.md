@@ -560,9 +560,11 @@ Runtime code uses FreeCAD's Qt shim:
 from PySide import QtCore, QtGui, QtWidgets
 ```
 
-Do not import `PySide2`/`PySide6` at runtime. If the addon must support both Qt5
-and Qt6, put enum/version differences in one compatibility module. For type
-checking, import `PySide6` under `TYPE_CHECKING`.
+Do not import `PySide2`/`PySide6` at runtime. The exception is Qt Quick:
+`QtQml`/`QtQuick`/`QtQuickWidgets` are not in FreeCAD's shim and are imported
+lazily from `PySide6` in GUI code. If the addon must support both Qt5 and Qt6,
+put enum/version differences in one compatibility module. For type checking,
+import `PySide6` under `TYPE_CHECKING`.
 
 A lazy compatibility module can defer loading Qt submodules until used; if you
 do this, register the proxy modules in `sys.modules` so `from myqt.QtCore import

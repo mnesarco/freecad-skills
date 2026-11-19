@@ -18,6 +18,7 @@ MyAddon/
 │     ├─ resources/
 │     │  ├─ icons/*.svg
 │     │  ├─ ui/*.ui
+│     │  ├─ qml/*.qml               # QML root views and module directories
 │     │  └─ translations/*.ts, *.qm
 │     └─ vendor/                  # only when vendoring is truly unavoidable
 ├─ package.xml
@@ -64,6 +65,9 @@ Rules:
   addon's workbench if any.
 - Module-level code should only define the workbench class, register it, and
   register icon/language paths. No heavy imports, no geometry, no network.
+- Do not create QML views here. The main window is not ready during `InitGui`;
+  defer Qt Quick setup with `QTimer.singleShot(0, ...)` and import the QML
+  helper module only then.
 - `Initialize()` runs the first time the user activates the workbench. Import
   command modules there and build toolbars/menus there.
 - `Activated()` / `Deactivated()` run every time the user switches into/out of
@@ -273,7 +277,9 @@ Rules:
   are provided by the FreeCAD runtime.
 - `PySide6` is a dev dependency for Qt tooling (`pyside6-lupdate`,
   `pyside6-lrelease`, Qt Designer) and type checking. Runtime code imports
-  `PySide`, not `PySide6`.
+  `PySide`, not `PySide6`; the one exception is `QtQml`/`QtQuick`/
+  `QtQuickWidgets`, imported lazily from `PySide6` because the shim does not
+  expose them. Do not add `PySide6` as a runtime dependency.
 - `freecad-stubs` is for editors/type checkers only. Do not import it at runtime.
   Configure the type checker to ignore missing imports for FreeCAD modules that
   are not present in the development environment.
@@ -399,8 +405,8 @@ Map legacy files to modern ones:
 | root `__init__.py` | remove; use package `__init__.py` |
 | `freecad/__init__.py` | remove; `freecad/` is a namespace |
 | `sys.path.append(...)` | relative imports |
-| `.qrc` / `.rcc` | plain SVG + `addIconPath()` |
-| `PySide2` / `PySide6` runtime imports | `from PySide import ...` |
+| `.qrc` / `.rcc` | plain SVG + `addIconPath()`; plain QML under `resources/qml/` |
+| `PySide2` / `PySide6` runtime imports | `from PySide import ...`; `PySide6` only for `QtQml`/`QtQuick`/`QtQuickWidgets`, lazily |
 | vendored library | declared dependency or isolated `vendor/` |
 
 If the addon has a legacy `manifest.ini`, map it rather than copying it:
