@@ -63,7 +63,11 @@ instructions to follow.
    entry point and is imported by FreeCAD at startup.
 3. **No import-time side effects.** No network, subprocesses, threads, dialogs,
    heavy geometry, or global UI manipulation at import. Defer work to
-   `Initialize()`, `Activated()`, or an explicit user action.
+   `Initialize()`, `Activated()`, or an explicit user action. Registration is
+   not a side effect: a non-workbench addon registers its commands, observers,
+   preference page, and `WorkbenchManipulator` at module level in
+   `init_gui.py`. Deferring the manipulator (e.g. `QTimer.singleShot`) misses
+   the startup workbench's menus until the next workbench switch.
 4. **No `sys.path` manipulation.** Use relative imports inside the addon
    package. Never add addon directories to `sys.path`.
 5. **Prefix global names.** Command, toolbar, and menu names are a global
