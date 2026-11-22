@@ -6,12 +6,12 @@ description: >-
   preferences, translations, FeaturePython document objects, properties,
   extensions, observers, Pivy/Coin3D view providers, or Qt Quick/QML
   (QQuickWidget) interfaces and task panels. Covers the modern namespaced
-  layout, package.xml metadata, commands, resources, testing, security, and
-  release quality. Do NOT use for FreeCAD core C++ development or single-file
-  macros.
+  layout, package.xml metadata, commands, resources, testing, security, Addon
+  Index admission, AI/MCP safety, and release quality. Do NOT use for FreeCAD
+  core C++ development or single-file macros.
 metadata:
   author: mnesarco
-  version: "1.1"
+  version: "1.2"
   freecad: ">=1.1"
   category: domain
 ---
@@ -43,6 +43,7 @@ Read this file first, then load the reference that matches the task:
 | Document/object/selection/transaction observers, view callbacks, cleanup | `references/events-and-lifecycle.md` |
 | Key FreeCAD API methods by area | `references/freecad-api-map.md` |
 | Tests, security, CI, Addon-Reports checks, review checklist | `references/quality-checklist.md` |
+| Addon Index admission: governance, GDPR, licensing, dependencies, AI/MCP | `references/addon-index-qualities.md` |
 
 When **writing**: produce the smallest complete addon that satisfies the
 request. No placeholders, no stub methods, no speculative options.
@@ -644,8 +645,9 @@ Rules:
 - `<name>` is the canonical addon name used by `depend type="addon"`.
 - `<version>` is SemVer or CalVer, never mixed; bump it whenever the tracked
   branch changes. `<date>` is `YYYY-MM-DD`.
-- `<license>` uses SPDX identifiers; `file` must exist and match the actual
-  license text. Put code and asset licenses in separate files.
+- `<license>` uses exact SPDX identifiers; `file` must exist and match the actual
+  license text. Put code and asset licenses in separate files, and keep
+  `package.xml`, the license files, and any per-file SPDX headers consistent.
 - `<icon>` is SVG, relative to `package.xml`, and should be under 16 kB.
 - `<url type="repository" branch="...">` must match the branch the manifest
   lives on. Add a raw README URL for the Addon Manager.
@@ -679,6 +681,55 @@ Full template, `pyproject.toml`, branch strategy, zip rules, and the optional
 `module.ClassName`. Moving `oldmodule.Box` to `freecad.myaddon.box.Box` breaks
 every existing document. Keep an alias at the old module path that re-exports
 the class, or accept a major-version break with an explicit migration note.
+
+## Addon Index admission
+
+Passing the Addon-Reports checker and having valid metadata is not enough: the
+official Index also enforces governance, GDPR/consent, licensing, codebase, and
+AI-agent requirements. The complete admission checklist, implementation
+patterns, evidence, and common rejection causes are in
+`references/addon-index-qualities.md`.
+
+Hard gates:
+
+- **Governance.** An active maintainer with working contact, timely issue/PR/
+  security handling, and a repository at least 30 days old. Provide a private
+  reporting route (for example `SECURITY.md`).
+- **Privacy.** No data leaves the machine without prior consent inside FreeCAD.
+  The consent names the service and every kind of data sent (including data sent
+  automatically), is per service, and is asked again when the service or data
+  changes. No default service; no ambient API keys or logins before consent.
+  Document service, endpoint, data, trigger, frequency, and opt-out in the
+  README.
+- **Local data.** Credentials go in the OS keyring where available; other
+  private data goes in a restricted file under the user's app-data directory
+  (`0600` on POSIX), never a shared temp directory, the addon directory, or
+  logs.
+- **Licensing.** Exact SPDX identifiers, consistent across `package.xml`, the
+  license files, and any per-file SPDX headers. Ship the full license text and
+  declare every license used (`LGPL2` normalizes to the wrong license).
+- **Manifest.** Schema-valid, correct `<content>`, workbench `<classname>`
+  matching the registered class, repository `<branch>` matching the branch the
+  manifest lives on, honest `freecadmin`/`freecadmax`.
+- **Compatibility.** Test the latest FreeCAD, or declare an honest maximum and
+  document the supported range.
+- **Dependencies.** Functionally necessary and on the Addon Manager allow-list;
+  never install packages at runtime. Vendor only when the allow-list path is
+  impossible; vendoring is strongly discouraged and grounds for rejection.
+- **UI and startup.** Commands, menus, and toolbars stay in the addon's own
+  workbench (or a scoped manipulator); never modify or hide core/other-addon UI.
+  No expensive work, network, or global side effects at import/startup.
+- **Completeness.** The tracked release branch is substantially complete, not
+  alpha scaffolding. README states what works and what does not; Bandit findings
+  are addressed.
+- **AI/MCP addons.** When the addon runs the agent itself, show the complete
+  code and wait for approval inside FreeCAD; run only the exact code the user
+  approved. File access at model-chosen paths also needs approval. Auto-approval
+  is a setting, off by default, warned in the UI; bridges keep the agent's
+  approval prompt. Remote AI requests need in-FreeCAD consent per service and
+  data. Listeners start only when enabled, always authenticate, bind loopback by
+  default, and use verified TLS for explicit remote addresses. One undo
+  transaction per approved run.
 
 ## Quality gates
 

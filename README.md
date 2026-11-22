@@ -12,8 +12,8 @@ Use when creating, reviewing, refactoring, packaging, or debugging a FreeCAD
 addon: workbenches, commands, preferences, translations, FeaturePython document
 objects, extensions, observers, Pivy/Coin3D view providers, and Qt Quick/QML
 interfaces and task panels. Covers the modern namespaced layout, `package.xml`
-metadata, testing, security, and release quality. Not for FreeCAD core C++ work
-or single-file macros.
+metadata, testing, security, Addon Index admission, AI/MCP safety, and release
+quality. Not for FreeCAD core C++ work or single-file macros.
 
 | Reference | Contents |
 |---|---|
@@ -27,6 +27,7 @@ or single-file macros.
 | `events-and-lifecycle.md` | Document/object/selection observers, view callbacks, cleanup |
 | `freecad-api-map.md` | Key FreeCAD API methods by area |
 | `quality-checklist.md` | Tests, security, CI, Addon-Reports checks, review checklist |
+| `addon-index-qualities.md` | Addon Index admission: governance, GDPR/consent, licensing, dependencies, AI/MCP safety |
 
 ## Install
 

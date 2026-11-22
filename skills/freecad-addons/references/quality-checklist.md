@@ -51,42 +51,68 @@ uv run analyze --skip-clone
 Scoring starts at 100; HIGH loses 3, MEDIUM loses 1, LOW loses 0.1, clamped at 0.
 Addons are sorted by score, then 30-day downloads, then name.
 
-## 2. Addon Index qualities
+## 2. Addon Index admission
 
-Admission to the official index requires more than passing the static checks:
+Passing the checker is not sufficient: the official Index is curated and also
+enforces governance, GDPR/consent, licensing, codebase, and AI-agent
+requirements. The full admission checklist, implementation patterns, evidence,
+and common rejection causes are in `references/addon-index-qualities.md`.
 
-- an active maintainer;
-- timely issue/PR/security handling;
-- a repository and codebase at least 30 days old;
-- GDPR compliance and clear disclosure of external connections;
-- consistent licensing (manifest, LICENSE files, SPDX headers);
-- Python 3 code that uses FreeCAD's Qt wrappers;
-- a valid manifest with the correct content type, workbench classname, and
-  repository branch;
-- commands/toolbars/menus confined to the addon's own workbench (or intentional
-  manipulator contributions);
-- no expensive work, network access, or global side effects at import;
-- compatibility with the latest FreeCAD, or an honest `freecadmin`/`freecadmax`;
-- only necessary dependencies, on the allow-list;
-- vendoring only when technically necessary (strongly discouraged);
-- a substantially complete addon, not alpha-level scaffolding;
-- Bandit issues addressed.
+Admission-critical rules:
+
+- an active maintainer, timely issue/PR/security handling, and a repository at
+  least 30 days old;
+- in-FreeCAD consent before any external data transfer, per service and data
+  kind, re-asked when either changes; no default service and no ambient
+  credentials before consent; secure local storage;
+- exact SPDX identifiers consistent across manifest, license files, and per-file
+  headers, with full license texts;
+- a valid manifest with the correct content type, matching workbench
+  `classname`, and matching repository branch; latest FreeCAD compatibility or an
+  honest `freecadmin`/`freecadmax`;
+- functionally necessary dependencies on the allow-list; no runtime installs;
+  vendoring only when the allow-list path is impossible;
+- commands/menus confined to the addon's own workbench or a scoped manipulator;
+  no expensive work, network, or global side effects at import/startup;
+- a substantially complete release branch and addressed Bandit findings;
+- AI addons: exact approved code execution, auto-approval off by default with an
+  in-UI warning, bridge approval prompt intact, loopback/authenticated/verified
+  listeners, private agent files, and one undo transaction per approved run.
 
 Curation (`curated: true`) is a stronger, human-reviewed subset. It is not a
 substitute for admission requirements.
 
 ## 3. Security checklist
 
-### Code execution
+### Code execution and AI addons
 
 - Do not use `eval()` or `exec()` on untrusted input.
 - If the addon intentionally runs user/model-generated code, show the complete
-  code, require explicit approval, and run it in one undo transaction. Do not
-  auto-approve; do not hide the code.
-- Do not add an "auto-approve" setting that is on by default.
-- If the addon is an AI/MCP bridge, keep the agent's approval prompt intact,
-  bind to loopback by default, require authentication, and warn inside FreeCAD
-  before starting a listener. Follow the Addon Index AI requirements.
+  code inside FreeCAD when the addon runs the agent, require explicit approval,
+  and run only the exact code shown. For a file, run the contents that were
+  displayed, not a fresh read. File reads/writes at paths the model chooses also
+  need approval; fixed document operations with model-supplied values do not.
+- Wrap each approved run in one undo transaction.
+- Automatic approval is opt-in: it may only be a setting, off by default, with a
+  warning in the interface itself. An addon that launches or configures an agent
+  must not enable auto-approval for code or file tools. A bridge must keep the
+  agent's approval prompt intact and warn inside FreeCAD when it starts.
+- Before any remote AI request, including one that only lists models, ask for
+  consent inside FreeCAD. Name the service and every kind of data sent,
+  including automatic data. Consent is per service and is asked again when the
+  service or data kinds change. No default service; do not use ambient API keys
+  or logins before consent.
+- Network listeners start only if the user enabled them, require authentication
+  on every request with no off switch, bind loopback by default, reject browser
+  requests (HTTP `Origin` header, or mismatched `Host`), and close on
+  out-of-protocol input. Remote access needs an explicit user-chosen address,
+  an in-FreeCAD warning and acceptance per address, and verified TLS (pinned
+  certificate or TLS-PSK; unchecked self-signed certificates do not count).
+- Agent tokens, pairing secrets, configuration, instructions, working
+  directories, and screenshots are private to the current user and never in
+  shared temporary directories. Credentials go in secure storage.
+- Full requirements and implementation patterns:
+  `references/addon-index-qualities.md` §5.
 
 ### Input and files
 
@@ -282,8 +308,21 @@ calling an addon done:
 - [ ] `package.xml` schema-valid; repository/readme URLs correct.
 - [ ] `classname` matches the workbench class.
 - [ ] Icon is SVG and under 16 kB.
-- [ ] License files exist; SPDX identifiers match.
-- [ ] `README.md` and `CHANGELOG.md` updated.
+- [ ] License files exist; exact SPDX identifiers match manifest, files, and
+      per-file headers.
+- [ ] Latest FreeCAD tested, or `freecadmin`/`freecadmax` states the honest
+      range.
+- [ ] All Python dependencies are necessary and allow-listed; no runtime
+      package installs; vendoring justified, isolated, and licensed.
+- [ ] README and `SECURITY.md` updated; privacy/external-services disclosure
+      matches the code.
+- [ ] In-FreeCAD consent is per service/data, revocable, and re-asked on change;
+      no default service or ambient credentials.
+- [ ] Credentials in secure storage; private files use restricted permissions
+      (`0600` on POSIX); no secrets in logs/repo/shared temp.
+- [ ] AI addons: exact approved code, auto-approval off by default with in-UI
+      warning, bridge prompt intact, listeners loopback/authenticated/verified
+      TLS, one undo per run.
 - [ ] `ruff`, `bandit`, `codespell`, and tests pass.
 - [ ] Addon-Reports/curation issues reviewed.
 - [ ] Translations updated and `.qm` compiled for supported locales.
@@ -319,6 +358,28 @@ rule. Rank by impact.
 - [ ] Maintainer, author, licenses, icon present and valid.
 - [ ] `pyproject.toml` has dev tooling; no FreeCAD/PySide runtime deps.
 - [ ] README/CHANGELOG useful; no placeholder text.
+
+### Governance, compliance, and licensing
+
+- [ ] Active maintainer with working contact; repository at least 30 days old.
+- [ ] `SECURITY.md` with a private reporting route, supported versions, and
+      prompt security-fix/advisory practice, including previously released
+      versions.
+- [ ] External services, data sent, trigger, frequency, retention, and opt-out
+      are documented in the README.
+- [ ] In-FreeCAD consent before any external data transfer, per service and data
+      kind; re-asked when either changes; revocable; no default service; no
+      ambient credentials before consent.
+- [ ] Credentials in the OS keyring where available; other private data in a
+      restricted file (`0600` on POSIX) under the user's app-data directory;
+      nothing in shared temp, the addon directory, logs, or the repo.
+- [ ] Exact SPDX identifiers agree across `package.xml`, license files, and
+      per-file headers; full license texts shipped; every license declared.
+- [ ] Python dependencies are necessary, typed, and allow-listed; no runtime
+      package installs; vendoring is justified and isolated with its upstream
+      license.
+- [ ] Latest FreeCAD tested, or `freecadmin`/`freecadmax` honestly restricts
+      the supported range and the README says so.
 
 ### Startup and imports
 
@@ -391,6 +452,29 @@ rule. Rank by impact.
 - [ ] Cached view/camera/dragger/widget checked with `shiboken.isValid`.
 - [ ] Camera values copied before mutation; camera reacquired on view change.
 
+### AI, code execution, and listeners
+
+- [ ] The complete code is shown before it runs (inside FreeCAD when the addon
+      runs the agent), and only the exact shown code runs; file contents are not
+      re-read after approval.
+- [ ] Model-chosen file reads/writes require approval; fixed document operations
+      with model-supplied values are allowed without it.
+- [ ] Each approved run is one undo transaction; errors abort it.
+- [ ] Auto-approval is only a setting, off by default, and warns in the UI; the
+      addon does not preset it when launching/configuring an agent.
+- [ ] A bridge keeps the agent's approval prompt, adds no auto-approve config or
+      skip-asking tool descriptions, and warns inside FreeCAD when started.
+- [ ] Every remote AI request, even model listing, is preceded by in-FreeCAD
+      consent naming the service and all data (including automatic data); per
+      service; re-asked on change; no default service or ambient credentials.
+- [ ] Listeners start only when enabled, authenticate every request with no off
+      switch, bind loopback, reject browser/out-of-protocol input, and use
+      explicit non-wildcard remote addresses with verified TLS.
+- [ ] Agent tokens/config/instructions/workdirs/screenshots are private
+      (restricted permissions, app-data, no shared temp); credentials use
+      secure storage.
+- [ ] Name/icon/description do not imply FreeCAD or AI-vendor endorsement.
+
 ### Quality and security
 
 - [ ] Tests cover non-trivial logic and migrations.
@@ -437,9 +521,15 @@ as precedent:
 | Model reset or rebuild from a delegate handler | `qFatal`; FreeCAD exits | `Qt.callLater` / zero-timer |
 | Building QML in a bare `QQmlComponent` test | No delegates, false pass | Offscreen `QQuickView` with `show()` |
 | Duplicated version strings | Drift between manifest, package, and UI | One source of truth + build sync |
-| Vendored helper library | Index policy discourages it; stale/security risk | Declared dependency or isolated `vendor/` with a strong reason |
+| Vendored helper library | Index policy discourages it; stale/security risk | Declared dependency or isolated `_vendor/` with a strong reason |
 | `exec`/`eval` of user code without approval | Arbitrary code execution | Show code, require consent, run in one transaction |
-| Alpha scaffolding in the release branch | Index rejects incomplete addons | Finish features before release |
+| Consent only in the README, or a default cloud service | Data leaves without permission; Index/GDPR failure | In-FreeCAD consent per service/data; no default service |
+| Previewing code, then re-reading the file to execute it | Runs code the user never saw | Execute the exact text that was displayed |
+| Auto-approve on by default, or an agent config with approvals disabled | Model code runs unreviewed | Off by default; in-UI warning; keep the agent prompt |
+| Listener on `0.0.0.0`, optional auth, or unchecked TLS | Anyone reachable can run code; traffic unverified | Loopback; mandatory auth; verified TLS for explicit remote addresses |
+| Tokens or agent files in `/tmp` or the addon directory | Secrets are world-readable or survive reinstall | App-data with restricted permissions; keyring for credentials |
+| `LGPL2` or another non-SPDX license string | Normalized to a more restrictive license; manifest/header drift | Exact SPDX ID in manifest, files, and headers |
+| Shipping a release branch full of alpha scaffolding | Index rejects incomplete addons | Finish features or keep them on a development branch |
 
 ## 9. Severity guide
 
@@ -447,8 +537,10 @@ When reporting review findings:
 
 - **HIGH** — install/startup broken; data loss; security issue; saved documents
   fail to load; manifest invalid or branch mismatch; root/freecad `__init__.py`;
-  a QML model/view rebuilt from its own handler (FreeCAD exits); a live QML
-  context object that can be collected.
+  unconsented data transfer or a default remote service; unauthenticated or
+  wildcard listener; auto-approval of model code on by default; secrets in
+  shared temp; a QML model/view rebuilt from its own handler (FreeCAD exits); a
+  live QML context object that can be collected.
 - **MEDIUM** — command doesn't work; undo broken; heavy startup cost; UI blocks
   or crashes; broken translations; missing migration; Coin accessed from
   `execute()`; QML built at import, blank QML on a load error, wrong theme

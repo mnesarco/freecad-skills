@@ -362,8 +362,9 @@ return [
 - `modifyDockWindows()` is currently a no-op. Add dock widgets directly with Qt.
 - Keep a reference to the manipulator object if you need to remove it with
   `Gui.removeWorkbenchManipulator(obj)`.
-- Do not hide, remove, or rewrite core UI beyond the specific contribution the
-  user installed the addon for.
+- Do not hide, remove, or rewrite core UI or another addon's UI beyond the
+  specific contribution the user installed the addon for. Return `[]` for
+  workbenches the manipulator does not intentionally change.
 
 ## 5. Qt and PySide
 

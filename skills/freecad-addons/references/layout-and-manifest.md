@@ -20,7 +20,7 @@ MyAddon/
 │     │  ├─ ui/*.ui
 │     │  ├─ qml/*.qml               # QML root views and module directories
 │     │  └─ translations/*.ts, *.qm
-│     └─ vendor/                  # only when vendoring is truly unavoidable
+│     └─ _vendor/                 # only when vendoring is truly unavoidable
 ├─ package.xml
 ├─ pyproject.toml
 ├─ README.md
@@ -172,7 +172,7 @@ declare only known tags.
 | `date` | `YYYY-MM-DD`, the release date. |
 | `maintainer` | At least one, with a working email. Orphaned addons use `no-one@freecad.org`. |
 | `author` | Optional but recommended; use a real contact where possible. |
-| `license` | SPDX identifier, one element per license. `file` is relative to `package.xml` and must exist. Every license used in code/assets needs an element. |
+| `license` | Exact SPDX identifier, one element per license. `file` is relative to `package.xml` and must exist. Every license used in code/assets needs an element. Keep the manifest, license files, and any per-file SPDX headers identical. `LGPL2` is normalized to `LGPL-2.0`; write `LGPL-2.1-or-later`. |
 | `icon` | SVG, relative to `package.xml`; keep it under 16 kB. Missing icon or a bitmap icon is a LOW issue in Addon-Reports. |
 | `freecadmin` | Minimum FreeCAD version as `MAJOR.MINOR.PATCH`. Set it honestly. |
 | `freecadmax` | Optional exact maximum. To cover a whole series, use e.g. `1.1.99`. |
@@ -199,16 +199,37 @@ declare only known tags.
 ```
 
 - Python dependencies must be functionally necessary and on the Addon Index
-  allow-list. No version specifiers for Python deps in `package.xml`; the
-  Addon Manager does not install versions for them.
+  allow-list. No version specifiers for Python deps in `package.xml`; the Addon
+  Manager does not install versions for them. Current list:
+  `FreeCAD/Addons` → `Data/Python/<python-version>/Allowed-Packages` (legacy:
+  `FreeCAD/FreeCAD-addons` → `ALLOWED_PYTHON_PACKAGES.txt`). Request additions
+  with the `Package - Addition` issue template; do not work around the list.
+- Do not install packages at runtime. The Addon Manager installs allow-listed
+  dependencies; a separate user-installed program may manage its own environment.
 - `type="addon"` names the canonical `<name>` of the other addon, not its repo.
 - `type="internal"` uses the lower-case internal workbench name (`part`,
   `sketch`, `mesh`, `import`, `draft`, ...).
 - `optional="true"` only when the addon genuinely works without it.
-- Avoid vendoring. The Addon Index strongly discourages it and can reject an
-  addon for it. If technically unavoidable, isolate it under
-  `freecad/<ModName>/vendor/`, keep its license, never modify it, and document
-  why it is vendored.
+- Avoid vendoring. The Addon Index strongly discourages it and treats it as
+  grounds for rejection. Never vendor an allow-listed package or one with
+  compiled extensions. If technically unavoidable, isolate it under
+  `freecad/<ModName>/_vendor/`, preserve the upstream `LICENSE`, add a
+  `_vendor/README.md` with source/version/modifications, never modify it without
+  recording why, and import it through your namespace
+  (`from freecad.MyAddon._vendor.somepkg import thing`).
+
+### License files and SPDX headers
+
+- Ship the full license text in the files referenced by `<license file="...">`.
+  Most licenses (LGPL, GPL, MIT, BSD, Apache, CC-BY-SA) require it.
+- Recommended defaults: `LGPL-2.1-or-later` for code, `CC-BY-SA-4.0` for
+  non-code assets, in separate `LICENSE-Code` and `LICENSE-Assets` files.
+- Add an SPDX header to source files if the project uses them, and keep it
+  identical to the manifest identifier:
+  `# SPDX-License-Identifier: LGPL-2.1-or-later`.
+- Keep `pyproject.toml` and README license statements consistent with
+  `package.xml`.
+- Vendored code keeps its upstream license and attribution.
 
 ## 5. `pyproject.toml`
 
@@ -265,7 +286,7 @@ ignore = [
 # Tune the ignore list to the project; do not disable whole rule families.
 
 [tool.bandit]
-exclude_dirs = [".venv", "freecad/MyAddon/vendor"]
+exclude_dirs = [".venv", "freecad/MyAddon/_vendor"]
 
 [tool.codespell]
 skip = "*/translations/*,*.svg,uv.lock"
@@ -360,6 +381,10 @@ result can be achieved with standard tools.
 6. Switch languages and check translated UI strings.
 7. Open a document created with the previous version and verify custom objects
    still load and recompute.
+8. If the addon uses an external service, decline consent and confirm no request
+   is made; accept and confirm the disclosed data matches what is sent. For AI
+   code execution, approve a sample run and verify one undo reverts it.
+9. Test on the newest FreeCAD version you claim, in a clean user directory.
 
 ## 7. README and repository hygiene
 
@@ -371,7 +396,11 @@ result can be achieved with standard tools.
 - requirements and compatibility (`freecadmin`, Python);
 - screenshots or a short GIF (stored under resources/media, not root clutter);
 - license summary and links;
-- known limitations.
+- known limitations and which features do/do not work;
+- maintainer/contact and a link to `SECURITY.md`;
+- `## Privacy and external services` when any network, telemetry, AI service, or
+  listener exists: service, endpoint, data sent, trigger, frequency, retention,
+  consent, and opt-out.
 
 `CHANGELOG.md` should list user-visible changes per version.
 
@@ -407,7 +436,7 @@ Map legacy files to modern ones:
 | `sys.path.append(...)` | relative imports |
 | `.qrc` / `.rcc` | plain SVG + `addIconPath()`; plain QML under `resources/qml/` |
 | `PySide2` / `PySide6` runtime imports | `from PySide import ...`; `PySide6` only for `QtQml`/`QtQuick`/`QtQuickWidgets`, lazily |
-| vendored library | declared dependency or isolated `vendor/` |
+| vendored library | declared dependency or isolated `_vendor/` |
 
 If the addon has a legacy `manifest.ini`, map it rather than copying it:
 

@@ -1,7 +1,7 @@
 {
   "name": "freecad-addons",
-  "version": "1.1.0",
-  "description": "FreeCAD 1.1+ addon development: workbenches, commands, preferences, translations, FeaturePython objects, observers, Pivy/Coin3D view providers, Qt Quick/QML interfaces, packaging, testing and release quality.",
+  "version": "1.2.0",
+  "description": "FreeCAD 1.1+ addon development: workbenches, commands, preferences, translations, FeaturePython objects, observers, Pivy/Coin3D view providers, Qt Quick/QML interfaces, Addon Index admission, AI/MCP safety, packaging, testing and release quality.",
   "author": {
     "name": "Frank Martínez",
     "url": "https://github.com/mnesarco"
@@ -9,6 +9,6 @@
   "homepage": "https://github.com/mnesarco/freecad-skills",
   "repository": "https://github.com/mnesarco/freecad-skills",
   "license": "MIT",
-  "keywords": ["freecad", "cad", "addon", "workbench", "python", "pivy", "coin3d", "qml", "qtquick"],
+  "keywords": ["freecad", "cad", "addon", "workbench", "python", "pivy", "coin3d", "qml", "qtquick", "addon-index", "mcp", "ai"],
   "skills": "./skills/"
 }

@@ -6,15 +6,15 @@
     "url": "https://github.com/mnesarco"
   },
   "metadata": {
-    "description": "Agent skills for FreeCAD addon development.",
-    "version": "1.1.0"
+    "description": "Agent skills for FreeCAD addon development, including Addon Index admission and AI/MCP safety.",
+    "version": "1.2.0"
   },
   "plugins": [
     {
       "name": "freecad-addons",
       "source": "./",
-      "description": "FreeCAD 1.1+ addon development: workbenches, commands, preferences, translations, FeaturePython objects, observers, Pivy/Coin3D view providers, Qt Quick/QML interfaces, packaging, testing and release quality.",
-      "version": "1.1.0",
+      "description": "FreeCAD 1.1+ addon development: workbenches, commands, preferences, translations, FeaturePython objects, observers, Pivy/Coin3D view providers, Qt Quick/QML interfaces, Addon Index admission, AI/MCP safety, packaging, testing and release quality.",
+      "version": "1.2.0",
       "author": {
         "name": "Frank Martínez",
         "url": "https://github.com/mnesarco"
@@ -22,7 +22,7 @@
       "homepage": "https://github.com/mnesarco/freecad-skills",
       "repository": "https://github.com/mnesarco/freecad-skills",
       "license": "MIT",
-      "keywords": ["freecad", "cad", "addon", "workbench", "python", "pivy", "coin3d", "qml", "qtquick"],
+      "keywords": ["freecad", "cad", "addon", "workbench", "python", "pivy", "coin3d", "qml", "qtquick", "addon-index", "mcp", "ai"],
       "category": "development"
     }
   ]
